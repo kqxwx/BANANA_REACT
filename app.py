@@ -18,25 +18,29 @@ from telethon.tl.types import ReactionEmoji
 APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 ENV_FILE = APP_DIR / "config.env"
 SESSION_FILE = APP_DIR / "banana_session"
-load_dotenv(ENV_FILE)
 
-BG = "#FFF9E8"
-PANEL = "#FFFFFF"
-INK = "#253018"
-MUTED = "#738064"
-GREEN = "#315C2B"
-LIME = "#D7F36A"
-GOLD = "#FFC928"
-LINE = "#E8EBD9"
+# Premium palette
+BG = "#111318"
+SURFACE = "#191C23"
+SURFACE_ALT = "#20242D"
+SURFACE_SOFT = "#252A34"
+TEXT = "#F4F1E9"
+MUTED = "#969BA6"
+GOLD = "#E9C46A"
+GOLD_HOVER = "#F2D58D"
+GREEN = "#9ACB9A"
+RED = "#E58B86"
+BORDER = "#303540"
 
 
 class BananaReactApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("BANANA REACT")
-        self.root.geometry("1040x760")
-        self.root.minsize(900, 680)
+        self.root.title("BANANA REACT — Telegram reactions")
+        self.root.geometry("1120x780")
+        self.root.minsize(980, 700)
         self.root.configure(bg=BG)
+
         self.events = queue.Queue()
         self.loop = None
         self.loop_ready = threading.Event()
@@ -44,152 +48,173 @@ class BananaReactApp:
         self.worker = None
         self.dialogs = []
         self.qr_photo = None
-        self.password_future = None
         self.connected = False
+        self.reactions_active = False
+        self._pulse_on = False
         self._build_ui()
-        self.root.after(150, self._poll_events)
+        self.root.after(120, self._poll_events)
+        self.root.after(700, self._animate)
         self.root.protocol("WM_DELETE_WINDOW", self._close)
 
+    def _label(self, parent, text, size=10, color=TEXT, weight="normal", **kwargs):
+        return tk.Label(parent, text=text, bg=kwargs.pop("bg", parent.cget("bg")),
+                        fg=color, font=("Segoe UI", size, weight), **kwargs)
+
+    def _button(self, parent, text, command, primary=False, **kwargs):
+        bg = GOLD if primary else SURFACE_SOFT
+        fg = "#17191E" if primary else TEXT
+        hover = GOLD_HOVER if primary else "#303642"
+        btn = tk.Button(parent, text=text, command=command, bg=bg, fg=fg,
+                        activebackground=hover, activeforeground=fg,
+                        disabledforeground="#666B75", relief="flat", bd=0,
+                        font=("Segoe UI", 10, "bold"), cursor="hand2",
+                        padx=18, pady=12, highlightthickness=0, **kwargs)
+        btn.bind("<Enter>", lambda _e: btn.configure(bg=hover) if btn["state"] != "disabled" else None)
+        btn.bind("<Leave>", lambda _e: btn.configure(bg=bg) if btn["state"] != "disabled" else None)
+        return btn
+
+    def _card(self, parent, **kwargs):
+        return tk.Frame(parent, bg=SURFACE, highlightbackground=BORDER,
+                        highlightthickness=1, **kwargs)
+
     def _build_ui(self):
-        # Modern dark UI — credentials are loaded silently from config.env.
-        BG = "#10131D"
-        CARD = "#1A2030"
-        CARD2 = "#20283A"
-        TEXT = "#F4F7FF"
-        MUTED = "#929DB5"
-        LIME = "#D7FF4F"
-        PURPLE = "#9B8CFF"
-        self.root.configure(bg=BG)
-
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("Banana.Vertical.TScrollbar",
-                        background=CARD2, troughcolor=BG, bordercolor=BG,
-                        arrowcolor=TEXT, relief="flat")
-
+        # Header
         header = tk.Frame(self.root, bg=BG)
-        header.pack(fill="x", padx=28, pady=(22, 16))
+        header.pack(fill="x", padx=34, pady=(27, 23))
+
         brand = tk.Frame(header, bg=BG)
-        brand.pack(side="left", fill="x", expand=True)
-        tk.Label(brand, text="🍌  BANANA REACT", bg=BG, fg=TEXT,
-                 font=("Segoe UI", 23, "bold")).pack(anchor="w")
-        tk.Label(brand, text="YOUR TELEGRAM. YOUR RULES. INSTANT REACTIONS.",
-                 bg=BG, fg=MUTED, font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(3, 0))
-        self.status = tk.Label(header, text="●  OFFLINE", bg=CARD2, fg=MUTED,
-                               font=("Segoe UI", 9, "bold"), padx=14, pady=9)
-        self.status.pack(side="right", anchor="center")
+        brand.pack(side="left")
+        mark = tk.Canvas(brand, width=42, height=42, bg=BG, highlightthickness=0)
+        mark.pack(side="left", padx=(0, 12))
+        mark.create_oval(2, 2, 40, 40, fill="#29251B", outline="#51452A", width=1)
+        mark.create_text(21, 21, text="🍌", font=("Segoe UI Emoji", 19))
+        titlebox = tk.Frame(brand, bg=BG)
+        titlebox.pack(side="left")
+        self._label(titlebox, "BANANA REACT", 20, TEXT, "bold").pack(anchor="w")
+        self._label(titlebox, "A LITTLE AUTOMATION. A LOT OF PERSONALITY.", 8, MUTED, "bold").pack(anchor="w", pady=(2, 0))
 
+        righthead = tk.Frame(header, bg=BG)
+        righthead.pack(side="right", anchor="center")
+        self.status_dot = tk.Label(righthead, text="●", bg=BG, fg="#777D89", font=("Segoe UI", 10))
+        self.status_dot.pack(side="left", padx=(0, 8))
+        self.status = self._label(righthead, "NOT CONNECTED", 9, MUTED, "bold", bg=BG)
+        self.status.pack(side="left")
+
+        # Main columns
         body = tk.Frame(self.root, bg=BG)
-        body.pack(fill="both", expand=True, padx=28, pady=(0, 24))
+        body.pack(fill="both", expand=True, padx=34, pady=(0, 30))
+        body.grid_columnconfigure(0, weight=4, uniform="main")
+        body.grid_columnconfigure(1, weight=6, uniform="main")
+        body.grid_rowconfigure(0, weight=1)
 
-        left = tk.Frame(body, bg=CARD, highlightbackground="#2B3449", highlightthickness=1)
-        left.pack(side="left", fill="y", padx=(0, 16))
-        left.configure(width=270)
-        left.pack_propagate(False)
+        # Left column: welcome + connection
+        left = tk.Frame(body, bg=BG)
+        left.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
+        hero = self._card(left)
+        hero.pack(fill="x")
+        self._label(hero, "YOUR TELEGRAM, REFINED", 8, GOLD, "bold").pack(anchor="w", padx=23, pady=(23, 12))
+        self._label(hero, "Make every\nmessage count.", 25, TEXT, "bold", justify="left").pack(anchor="w", padx=23)
+        self._label(hero, "Connect your personal Telegram account and let the banana do the reacting.", 10, MUTED, wraplength=330, justify="left").pack(anchor="w", padx=23, pady=(12, 21))
+        self.connect_btn = self._button(hero, "Connect Telegram  ↗", self.connect, primary=True)
+        self.connect_btn.pack(fill="x", padx=23, pady=(0, 22))
 
-        tk.Label(left, text="✦  CONTROL CENTER", bg=CARD, fg=LIME,
-                 font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=20, pady=(22, 16))
-        tk.Label(left, text="Ready to go bananas?", bg=CARD, fg=TEXT,
-                 font=("Segoe UI", 17, "bold"), wraplength=220,
-                 justify="left").pack(anchor="w", padx=20)
-        tk.Label(left, text="Connect your Telegram account with a QR code. No phone number entry.",
-                 bg=CARD, fg=MUTED, font=("Segoe UI", 9), wraplength=220,
-                 justify="left").pack(anchor="w", padx=20, pady=(8, 18))
-
-        self.connect_btn = tk.Button(left, text="  CONNECT TELEGRAM  ↗",
-            command=self.connect, bg=LIME, fg="#151A22",
-            activebackground="#C6EF3F", activeforeground="#151A22",
-            relief="flat", bd=0, font=("Segoe UI", 10, "bold"),
-            cursor="hand2", pady=14)
-        self.connect_btn.pack(fill="x", padx=20)
-
-        tk.Frame(left, bg="#30394D", height=1).pack(fill="x", padx=20, pady=20)
-        tk.Label(left, text="HOW IT WORKS", bg=CARD, fg=PURPLE,
-                 font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=20, pady=(0, 10))
+        # Connection guide
+        guide = self._card(left)
+        guide.pack(fill="x", pady=(14, 0))
+        self._label(guide, "THE QUICK SETUP", 9, TEXT, "bold").pack(anchor="w", padx=21, pady=(19, 13))
         steps = [
-            ("01", "Connect", "Scan the QR in Telegram"),
-            ("02", "Pick chats", "Choose where to react"),
-            ("03", "Activate", "Bananas on every new message"),
+            ("01", "Connect", "Scan the QR code in Telegram"),
+            ("02", "Choose chats", "Select where reactions belong"),
+            ("03", "Go live", "New incoming messages get 🍌"),
         ]
-        for number, title, desc in steps:
-            line = tk.Frame(left, bg=CARD)
+        for num, name, desc in steps:
+            line = tk.Frame(guide, bg=SURFACE)
             line.pack(fill="x", padx=20, pady=7)
-            tk.Label(line, text=number, bg=CARD2, fg=LIME,
-                     font=("Segoe UI", 9, "bold"), padx=8, pady=6).pack(side="left", padx=(0, 10))
-            words = tk.Frame(line, bg=CARD)
+            chip = tk.Label(line, text=num, bg="#302B20", fg=GOLD,
+                            font=("Segoe UI", 8, "bold"), padx=9, pady=7)
+            chip.pack(side="left", padx=(0, 12))
+            words = tk.Frame(line, bg=SURFACE)
             words.pack(side="left", fill="x", expand=True)
-            tk.Label(words, text=title, bg=CARD, fg=TEXT,
-                     font=("Segoe UI", 9, "bold")).pack(anchor="w")
-            tk.Label(words, text=desc, bg=CARD, fg=MUTED,
-                     font=("Segoe UI", 8)).pack(anchor="w")
+            self._label(words, name, 10, TEXT, "bold").pack(anchor="w")
+            self._label(words, desc, 8, MUTED).pack(anchor="w", pady=(2, 0))
+        self._label(guide, "⌁  Your login session stays on this PC.", 8, MUTED).pack(anchor="w", padx=21, pady=(15, 19))
 
-        tk.Label(left, text="🔒  Session stays on this computer",
-                 bg=CARD, fg=MUTED, font=("Segoe UI", 8),
-                 wraplength=220, justify="left").pack(side="bottom", anchor="w",
-                                                       padx=20, pady=20)
+        # Right column workspace
+        right = self._card(body)
+        right.grid(row=0, column=1, sticky="nsew")
+        right.grid_rowconfigure(2, weight=1)
+        right.grid_columnconfigure(0, weight=1)
 
-        right = tk.Frame(body, bg=CARD, highlightbackground="#2B3449", highlightthickness=1)
-        right.pack(side="left", fill="both", expand=True)
+        workspace_head = tk.Frame(right, bg=SURFACE)
+        workspace_head.grid(row=0, column=0, sticky="ew", padx=23, pady=(21, 13))
+        self._label(workspace_head, "Workspace", 17, TEXT, "bold").pack(anchor="w")
+        self._label(workspace_head, "Your connected account and selected conversations.", 9, MUTED).pack(anchor="w", pady=(4, 0))
 
-        top = tk.Frame(right, bg=CARD)
-        top.pack(fill="x", padx=22, pady=(20, 12))
-        tk.Label(top, text="Your workspace", bg=CARD, fg=TEXT,
-                 font=("Segoe UI", 18, "bold")).pack(anchor="w")
-        tk.Label(top, text="Choose the chats where BANANA REACT should be active.",
-                 bg=CARD, fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w", pady=(4, 0))
+        # QR / account state panel
+        self.qr_area = tk.Frame(right, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1, height=225)
+        self.qr_area.grid(row=1, column=0, sticky="ew", padx=23, pady=(0, 17))
+        self.qr_area.grid_propagate(False)
+        self.qr_label = tk.Label(self.qr_area, text="QR LOGIN", bg=SURFACE_ALT, fg=GOLD,
+                                 font=("Segoe UI", 9, "bold"), justify="center")
+        self.qr_label.pack(expand=True, fill="both", pady=12)
+        self.qr_hint = self._label(self.qr_area, "Your secure Telegram sign-in will appear here.", 8, MUTED, bg=SURFACE_ALT)
+        self.qr_hint.place(relx=0.5, rely=0.87, anchor="center")
 
-        self.qr_area = tk.Frame(right, bg=CARD2, highlightbackground="#343E55", highlightthickness=1)
-        self.qr_area.pack(fill="x", padx=22, pady=(4, 14))
-        self.qr_label = tk.Label(self.qr_area,
-            text="QR CODE WILL APPEAR HERE\n\nConnect Telegram to get started",
-            bg=CARD2, fg=MUTED, font=("Segoe UI", 10), pady=25, justify="center")
-        self.qr_label.pack()
+        # Chat list
+        chats = tk.Frame(right, bg=SURFACE)
+        chats.grid(row=2, column=0, sticky="nsew", padx=23)
+        chats.grid_rowconfigure(1, weight=1)
+        chats.grid_columnconfigure(0, weight=1)
+        chathead = tk.Frame(chats, bg=SURFACE)
+        chathead.grid(row=0, column=0, sticky="ew", pady=(0, 9))
+        self._label(chathead, "YOUR CHATS", 9, TEXT, "bold").pack(side="left")
+        self.chat_count = self._label(chathead, "NOT LOADED", 8, MUTED, "bold")
+        self.chat_count.pack(side="right")
 
-        list_frame = tk.Frame(right, bg=CARD)
-        list_frame.pack(fill="both", expand=True, padx=22, pady=(0, 12))
-        list_head = tk.Frame(list_frame, bg=CARD)
-        list_head.pack(fill="x", pady=(0, 8))
-        tk.Label(list_head, text="YOUR CHATS", bg=CARD, fg=TEXT,
-                 font=("Segoe UI", 9, "bold")).pack(side="left")
-        tk.Label(list_head, text="MULTI-SELECT", bg=CARD, fg=PURPLE,
-                 font=("Segoe UI", 8, "bold")).pack(side="right")
+        listwrap = tk.Frame(chats, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1)
+        listwrap.grid(row=1, column=0, sticky="nsew")
+        listwrap.grid_rowconfigure(0, weight=1)
+        listwrap.grid_columnconfigure(0, weight=1)
+        self.chat_list = tk.Listbox(listwrap, selectmode=tk.EXTENDED, activestyle="none",
+            bg=SURFACE_ALT, fg=TEXT, selectbackground="#51452A", selectforeground=GOLD,
+            relief="flat", highlightthickness=0, font=("Segoe UI", 10),
+            exportselection=False, selectborderwidth=0, borderwidth=0)
+        self.chat_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=8)
+        scroll = ttk.Scrollbar(listwrap, orient="vertical", command=self.chat_list.yview)
+        scroll.grid(row=0, column=1, sticky="ns", pady=8, padx=(0, 5))
+        self.chat_list.configure(yscrollcommand=scroll.set)
+        self.chat_list.insert(tk.END, "Connect Telegram to load your chats")
 
-        self.chat_list = tk.Listbox(list_frame, selectmode=tk.EXTENDED, activestyle="none",
-            bg="#151B28", fg=TEXT, selectbackground="#39472A", selectforeground=LIME,
-            relief="flat", highlightthickness=1, highlightbackground="#30394D",
-            font=("Segoe UI", 10), exportselection=False,
-            selectborderwidth=0)
-        self.chat_list.pack(side="left", fill="both", expand=True)
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical",
-                                  command=self.chat_list.yview,
-                                  style="Banana.Vertical.TScrollbar")
-        scrollbar.pack(side="right", fill="y")
-        self.chat_list.configure(yscrollcommand=scrollbar.set)
-
-        footer = tk.Frame(right, bg=CARD)
-        footer.pack(fill="x", padx=22, pady=(0, 20))
-        self.start_btn = tk.Button(footer, text="🍌   ACTIVATE BANANA REACTIONS",
-            command=self.enable_reactions, state="disabled", bg=LIME, fg="#151A22",
-            activebackground="#C6EF3F", relief="flat", bd=0,
-            font=("Segoe UI", 10, "bold"), cursor="hand2", pady=13)
+        # Action bar
+        actions = tk.Frame(right, bg=SURFACE)
+        actions.grid(row=3, column=0, sticky="ew", padx=23, pady=(14, 21))
+        self.start_btn = self._button(actions, "🍌   Activate reactions", self.enable_reactions, primary=True)
         self.start_btn.pack(fill="x")
-        self.stop_btn = tk.Button(footer, text="PAUSE REACTIONS",
-            command=self.stop_reactions, state="disabled", bg=CARD2, fg=TEXT,
-            activebackground="#30394D", relief="flat", bd=0,
-            font=("Segoe UI", 9, "bold"), pady=10)
+        self.start_btn.configure(state="disabled")
+        self.stop_btn = self._button(actions, "Pause reactions", self.stop_reactions)
         self.stop_btn.pack(fill="x", pady=(8, 0))
+        self.stop_btn.configure(state="disabled")
+
+        footer = tk.Frame(self.root, bg=BG)
+        footer.pack(fill="x", padx=35, pady=(0, 13))
+        self._label(footer, "BANANA REACT  /  PERSONAL TELEGRAM CLIENT", 8, "#686E79", "bold").pack(side="left")
+        self._label(footer, "PRIVATE SESSION  •  LOCAL STORAGE", 8, "#686E79", "bold").pack(side="right")
+
+    def _set_status(self, text, color=MUTED):
+        self.status.configure(text=text.upper(), fg=color)
 
     def _save_settings(self):
-        # API credentials are not shown in the UI; load them from config.env.
         load_dotenv(ENV_FILE, override=True)
         api_id = os.getenv("API_ID", "").strip()
         api_hash = os.getenv("API_HASH", "").strip()
         if not api_id.isdigit() or not api_hash:
             messagebox.showerror(
-                "Configuration missing",
-                "Telegram connection settings are not configured. "
-                "A config.env file with API_ID and API_HASH must be placed "
-                "next to the application. These fields are intentionally hidden."
+                "Setup required",
+                "Telegram API settings were not found.\n\n"
+                "Create config.env next to BANANA_REACT.exe with these two lines:\n"
+                "API_ID=your_api_id\nAPI_HASH=your_api_hash\n\n"
+                "Get them from https://my.telegram.org.\n"
+                "The values are never displayed in the app or uploaded by it."
             )
             return False
         self._api_id_value = api_id
@@ -199,6 +224,7 @@ class BananaReactApp:
     def _start_worker(self):
         if self.loop and self.loop.is_running():
             return
+        self.loop_ready.clear()
         def runner():
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
@@ -212,11 +238,18 @@ class BananaReactApp:
             return
         if not self._save_settings():
             return
-        self.connect_btn.configure(state="disabled", text="CONNECTING…")
-        self.status.configure(text="●  Connecting…", fg="#A07800")
+        self.connect_btn.configure(state="disabled", text="Connecting…")
+        self._set_status("Connecting", GOLD)
+        self.qr_label.configure(image="", text="PREPARING SECURE QR LOGIN", fg=GOLD,
+                                font=("Segoe UI", 9, "bold"))
+        self.qr_hint.configure(text="Open Telegram → Settings → Devices → Link Desktop Device")
         self._start_worker()
-        self.loop_ready.wait(timeout=10)
-        asyncio.run_coroutine_threadsafe(self._connect_task(int(self._api_id_value), self._api_hash_value), self.loop)
+        if not self.loop_ready.wait(timeout=10):
+            self.events.put(("error", "The background connection worker did not start."))
+            return
+        asyncio.run_coroutine_threadsafe(
+            self._connect_task(int(self._api_id_value), self._api_hash_value), self.loop
+        )
 
     async def _connect_task(self, api_id, api_hash):
         try:
@@ -235,7 +268,6 @@ class BananaReactApp:
                         await qr_login.recreate()
                     except SessionPasswordNeededError:
                         future = self.loop.create_future()
-                        self.password_future = future
                         self.events.put(("need_password", future))
                         password = await future
                         await self.client.sign_in(password=password)
@@ -243,15 +275,14 @@ class BananaReactApp:
             me = await self.client.get_me()
             self.events.put(("connected", getattr(me, "first_name", "Telegram")))
             dialogs = await self.client.get_dialogs()
-            self.dialogs = [(d.id, d.name or "Unnamed chat") for d in dialogs]
-            self.events.put(("chats", self.dialogs))
+            self.events.put(("chats", [(d.id, d.name or "Unnamed chat") for d in dialogs]))
         except Exception as exc:
             self.events.put(("error", str(exc)))
 
     def enable_reactions(self):
         selected = self.chat_list.curselection()
         if not selected:
-            messagebox.showinfo("Choose chats", "Select at least one chat first.")
+            messagebox.showinfo("Choose chats", "Select at least one chat to activate reactions.")
             return
         chat_ids = {self.dialogs[i][0] for i in selected}
         asyncio.run_coroutine_threadsafe(self._install_handler(chat_ids), self.loop)
@@ -288,60 +319,77 @@ class BananaReactApp:
             del self._handler
         self.events.put(("stopped", None))
 
+    def _animate(self):
+        self._pulse_on = not self._pulse_on
+        if self.connected:
+            self.status_dot.configure(fg=GREEN if self._pulse_on else "#5D8D66")
+        elif self.status.cget("text") != "NOT CONNECTED":
+            self.status_dot.configure(fg=GOLD if self._pulse_on else "#8B7444")
+        else:
+            self.status_dot.configure(fg="#777D89")
+        self.root.after(700, self._animate)
+
     def _poll_events(self):
         try:
             while True:
                 kind, data = self.events.get_nowait()
                 if kind == "qr":
                     image = Image.open(data)
-                    image.thumbnail((190, 190))
+                    image.thumbnail((176, 176))
                     self.qr_photo = ImageTk.PhotoImage(image)
                     self.qr_label.configure(image=self.qr_photo, text="")
+                    self.qr_hint.configure(text="Scan with Telegram → Settings → Devices")
                 elif kind == "need_password":
-                    self.password_future = data
-                    password = simpledialog.askstring("Telegram 2-step verification",
+                    password = simpledialog.askstring(
+                        "Telegram verification",
                         "Enter your Telegram 2-step verification password:",
-                        show="•", parent=self.root)
+                        show="•", parent=self.root
+                    )
                     if password:
                         self.loop.call_soon_threadsafe(data.set_result, password)
                     else:
-                        self.loop.call_soon_threadsafe(data.set_exception,
-                            RuntimeError("2-step verification was cancelled."))
+                        self.loop.call_soon_threadsafe(
+                            data.set_exception, RuntimeError("2-step verification was cancelled.")
+                        )
                 elif kind == "connected":
                     self.connected = True
-                    self.status.configure(text=f"●  Connected as {data}", fg=GREEN)
-                    self.qr_label.configure(image="", text="✓  Telegram connected successfully",
-                                            fg=GREEN, font=("Segoe UI", 11, "bold"), pady=24)
-                    self.connect_btn.configure(text="CONNECTED", state="disabled")
+                    self._set_status(f"Connected · {data}", GREEN)
+                    self.qr_label.configure(image="", text="✓", fg=GREEN, font=("Segoe UI", 36, "bold"))
+                    self.qr_hint.configure(text=f"Signed in as {data}")
+                    self.connect_btn.configure(text="Telegram connected", state="disabled")
                 elif kind == "chats":
                     self.dialogs = data
                     self.chat_list.delete(0, tk.END)
                     for _, name in data:
-                        self.chat_list.insert(tk.END, name)
+                        self.chat_list.insert(tk.END, "  " + name)
+                    self.chat_count.configure(text=f"{len(data)} CONVERSATIONS")
                     self.start_btn.configure(state="normal")
                 elif kind == "active":
-                    self.status.configure(text=f"●  Banana reactions ON · {data} chats", fg=GREEN)
+                    self.reactions_active = True
+                    self._set_status(f"Reactions active · {data} chats", GREEN)
                     self.start_btn.configure(state="disabled")
                     self.stop_btn.configure(state="normal")
                 elif kind == "stopped":
-                    self.status.configure(text="●  Connected · reactions paused", fg=MUTED)
+                    self.reactions_active = False
+                    self._set_status("Connected · reactions paused", MUTED)
                     self.start_btn.configure(state="normal")
                     self.stop_btn.configure(state="disabled")
                 elif kind == "reaction":
-                    self.status.configure(text="🍌  Reaction sent", fg=GREEN)
+                    self._set_status("Banana reaction sent", GREEN)
                 elif kind == "notice":
-                    self.status.configure(text=str(data)[:80], fg="#A07800")
+                    self._set_status(str(data)[:75], GOLD)
                 elif kind == "error":
-                    self.status.configure(text="●  Connection error", fg="#B42318")
-                    self.connect_btn.configure(state="normal", text="TRY AGAIN")
+                    self._set_status("Connection error", RED)
+                    self.connect_btn.configure(state="normal", text="Try again")
                     messagebox.showerror("BANANA REACT", data)
         except queue.Empty:
             pass
-        self.root.after(150, self._poll_events)
+        self.root.after(120, self._poll_events)
 
     def _close(self):
-        if self.loop and self.loop.is_running() and self.client:
-            asyncio.run_coroutine_threadsafe(self.client.disconnect(), self.loop)
+        if self.loop and self.loop.is_running():
+            if self.client:
+                asyncio.run_coroutine_threadsafe(self.client.disconnect(), self.loop)
             self.loop.call_soon_threadsafe(self.loop.stop)
         self.root.destroy()
 
