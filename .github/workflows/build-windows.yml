@@ -1,0 +1,35 @@
+name: Build BANANA REACT
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: Build executable
+        run: pyinstaller --noconfirm --clean --windowed --name BANANA_REACT --collect-all telethon --collect-all qrcode --collect-all PIL app.py
+      - name: Package executable
+        run: Compress-Archive -Path dist/BANANA_REACT/* -DestinationPath BANANA-REACT-Windows.zip
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: BANANA-REACT-Windows
+          path: BANANA-REACT-Windows.zip
+          if-no-files-found: error
+          retention-days: 30
