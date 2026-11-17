@@ -39,6 +39,7 @@ class BananaReactApp:
         self.root.configure(bg=BG)
         self.events = queue.Queue()
         self.loop = None
+        self.loop_ready = threading.Event()
         self.client = None
         self.worker = None
         self.dialogs = []
@@ -150,6 +151,7 @@ class BananaReactApp:
         def runner():
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
+            self.loop_ready.set()
             self.loop.run_forever()
         self.worker = threading.Thread(target=runner, daemon=True)
         self.worker.start()
@@ -162,12 +164,12 @@ class BananaReactApp:
         self.connect_btn.configure(state="disabled", text="CONNECTING…")
         self.status.configure(text="●  Connecting…", fg="#A07800")
         self._start_worker()
-        asyncio.run_coroutine_threadsafe(self._connect_task(), self.loop)
+        self.loop_ready.wait(timeout=10)
+        asyncio.run_coroutine_threadsafe(self._connect_task(int(self.api_id.get().strip()), self.api_hash.get().strip()), self.loop)
 
-    async def _connect_task(self):
+    async def _connect_task(self, api_id, api_hash):
         try:
-            self.client = TelegramClient(str(SESSION_FILE), int(self.api_id.get().strip()),
-                                         self.api_hash.get().strip())
+            self.client = TelegramClient(str(SESSION_FILE), api_id, api_hash)
             await self.client.connect()
             if not await self.client.is_user_authorized():
                 qr_login = await self.client.qr_login()
@@ -185,8 +187,7 @@ class BananaReactApp:
             me = await self.client.get_me()
             self.events.put(("connected", getattr(me, "first_name", "Telegram")))
             dialogs = await self.client.get_dialogs()
-            self.dialogs = [(d.id, d.name or "Unnamed chat") for d in dialogs
-                            if d.is_group or d.is_channel]
+            self.dialogs = [(d.id, d.name or "Unnamed chat") for d in dialogs]
             self.events.put(("chats", self.dialogs))
         except Exception as exc:
             self.events.put(("error", str(exc)))
