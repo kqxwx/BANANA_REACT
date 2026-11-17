@@ -293,10 +293,9 @@ class BananaReactApp:
                 self.client.remove_event_handler(self._handler)
             async def handler(event):
                 try:
-                    if event.out:
-                        return
                     chat_id = event.chat_id
-                    self.events.put(("notice", f"Incoming message detected · chat {chat_id}"))
+                    direction = "Outgoing" if event.out else "Incoming"
+                    self.events.put(("notice", f"{direction} message detected · chat {chat_id}"))
                     if chat_id not in chat_ids:
                         self.events.put(("notice", f"Message received, but chat {chat_id} is not selected"))
                         return
@@ -309,7 +308,7 @@ class BananaReactApp:
                 except Exception as exc:
                     self.events.put(("notice", f"Reaction failed: {type(exc).__name__}: {exc}"))
             self._handler = handler
-            self.client.add_event_handler(handler, events.NewMessage(incoming=True))
+            self.client.add_event_handler(handler, events.NewMessage())
             self.events.put(("active", len(chat_ids)))
         except Exception as exc:
             self.events.put(("error", str(exc)))
