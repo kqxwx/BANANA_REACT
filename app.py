@@ -89,7 +89,7 @@ class BananaReactApp:
                  font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=18)
         guide = "1. Enter API ID and API HASH\n2. Connect and scan the QR in Telegram\n3. Enter your 2-step password if asked\n4. Choose chats on the right\n5. Switch on banana reactions"
         tk.Label(left, text=guide, bg=PANEL, fg=INK, justify="left",
-                 font=("Segoe UI", 9), lineSpacing=7).pack(anchor="w", padx=18, pady=10)
+                 font=("Segoe UI", 9)).pack(anchor="w", padx=18, pady=10)
         tk.Label(left, text="Credentials and session stay on this PC.",
                  bg=PANEL, fg=MUTED, wraplength=240, justify="left",
                  font=("Segoe UI", 8)).pack(side="bottom", anchor="w", padx=18, pady=16)
