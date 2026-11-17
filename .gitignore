@@ -1,0 +1,14 @@
+# Secrets and Telegram sessions
+config.env
+*.session
+*.session-journal
+login_qr.png
+
+# Python/build output
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.spec
