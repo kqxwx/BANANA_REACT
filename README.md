@@ -1,20 +1,25 @@
 # BANANA REACT 🍌
 
-Windows desktop app that signs in to your own Telegram account using Telegram QR login, lets you choose chats, and automatically adds 🍌 to incoming messages in those chats.
+A Windows desktop user-client for your own Telegram account. Sign in with Telegram QR login, choose conversations, and automatically add 🍌 to new incoming messages in those chats.
 
 ## Download
 
-After the GitHub Actions build finishes, open **Actions → Build BANANA REACT → latest successful run → Artifacts** and download `BANANA-REACT-Windows`. Extract the ZIP and run `BANANA_REACT.exe`.
+Open **Actions → Build BANANA REACT → latest successful run → Artifacts** and download `BANANA-REACT-Windows`. Extract the ZIP and run `BANANA_REACT.exe`.
 
 ## First launch
 
-1. Get your Telegram API ID and API hash from https://my.telegram.org.
-2. Enter them in the app's settings. They are saved locally in `config.env` next to the executable and are not uploaded anywhere by this project.
-3. Click **Connect Telegram**, then scan the QR in Telegram → Settings → Devices → Link Desktop Device.
-4. If Telegram asks for your 2-step verification password, enter it in the app.
-5. Select chats and click **Enable banana reactions**.
+1. Create a local file named `config.env` in the same folder as `BANANA_REACT.exe`.
+2. Add your Telegram API credentials to that file:
+   ```env
+   API_ID=your_api_id
+   API_HASH=your_api_hash
+   ```
+3. Get the values from https://my.telegram.org. The app does not show these values in its interface. Do not share the file or commit it to GitHub.
+4. Click **Connect Telegram**. In Telegram, open **Settings → Devices → Link Desktop Device**, then scan the QR code shown in the app.
+5. If Telegram asks for your 2-step verification password, enter it in the app's secure prompt.
+6. Select the chats and activate banana reactions.
 
-The Telegram session is stored locally in `banana_session.session` next to the app. Keep this file private. Anyone who obtains it may be able to access your Telegram account. Do not upload it or send it to anyone.
+The Telegram session is stored locally in `banana_session.session` next to the app. Keep this file private. Anyone who obtains it may be able to access your Telegram account. Never upload or send it to anyone.
 
 ## Build locally
 
@@ -25,10 +30,10 @@ py -m pip install -r requirements.txt pyinstaller
 pyinstaller --noconfirm --clean --windowed --name BANANA_REACT --collect-all telethon --collect-all qrcode --collect-all PIL app.py
 ```
 
-The GitHub Actions workflow builds the Windows executable automatically on each push to `main`.
+GitHub Actions builds the Windows package automatically on every push to `main`.
 
 ## Notes
 
-- This is a user-account client, not a Telegram bot. No bot needs to be added to chats.
-- Reactions are sent only to new incoming messages in chats you select.
-- Respect Telegram's terms and the rules of each chat. Avoid excessive automation.
+- This is a personal Telegram user-client, not a Telegram bot. You do not need to add a bot to chats.
+- Reactions are sent only to new incoming messages in the chats you select.
+- The API credentials and session remain local to your computer. Avoid excessive automation and follow Telegram's terms and each chat's rules.
