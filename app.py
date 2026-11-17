@@ -10,7 +10,7 @@ from pathlib import Path
 import qrcode
 from PIL import Image, ImageTk
 from dotenv import load_dotenv
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, utils
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
@@ -275,7 +275,7 @@ class BananaReactApp:
             me = await self.client.get_me()
             self.events.put(("connected", getattr(me, "first_name", "Telegram")))
             dialogs = await self.client.get_dialogs()
-            self.events.put(("chats", [(d.id, d.name or "Unnamed chat") for d in dialogs]))
+            self.events.put(("chats", [(utils.get_peer_id(d.entity), d.name or "Unnamed chat") for d in dialogs]))
         except Exception as exc:
             self.events.put(("error", str(exc)))
 
