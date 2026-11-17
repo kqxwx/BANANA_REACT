@@ -11,7 +11,7 @@ import qrcode
 from PIL import Image, ImageTk
 from dotenv import load_dotenv
 from telethon import TelegramClient, events, utils
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import SessionPasswordNeededError, FloodWaitError
 from telethon.tl.functions.messages import SendReactionRequest
 from telethon.tl.types import ReactionEmoji
 
@@ -310,6 +310,38 @@ class BananaReactApp:
             self._handler = handler
             self.client.add_event_handler(handler, events.NewMessage())
             self.events.put(("active", len(chat_ids)))
+            # Backfill: add the banana to existing messages in every selected chat.
+            total_done = 0
+            total_failed = 0
+            for chat_id in chat_ids:
+                try:
+                    entity = await self.client.get_input_entity(chat_id)
+                    async for message in self.client.iter_messages(entity):
+                        if not message or not getattr(message, "id", None):
+                            continue
+                        while True:
+                            try:
+                                await self.client(SendReactionRequest(
+                                    peer=entity,
+                                    msg_id=message.id,
+                                    reaction=[ReactionEmoji(emoticon="🍌")]
+                                ))
+                                total_done += 1
+                                break
+                            except FloodWaitError as exc:
+                                self.events.put(("notice", f"Telegram rate limit: waiting {exc.seconds}s"))
+                                await asyncio.sleep(exc.seconds + 1)
+                            except Exception as exc:
+                                total_failed += 1
+                                if total_failed == 1:
+                                    self.events.put(("notice", f"Some messages cannot be reacted to: {type(exc).__name__}: {exc}"))
+                                break
+                        if total_done and total_done % 25 == 0:
+                            self.events.put(("notice", f"History scan: {total_done} messages processed"))
+                except Exception as exc:
+                    total_failed += 1
+                    self.events.put(("notice", f"Could not scan chat {chat_id}: {type(exc).__name__}: {exc}"))
+            self.events.put(("notice", f"History scan finished · {total_done} reacted · {total_failed} failed"))
         except Exception as exc:
             self.events.put(("error", str(exc)))
 
