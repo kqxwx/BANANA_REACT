@@ -292,17 +292,22 @@ class BananaReactApp:
             if hasattr(self, "_handler"):
                 self.client.remove_event_handler(self._handler)
             async def handler(event):
-                if event.chat_id not in chat_ids or event.out:
-                    return
                 try:
+                    if event.out:
+                        return
+                    chat_id = event.chat_id
+                    self.events.put(("notice", f"Incoming message detected · chat {chat_id}"))
+                    if chat_id not in chat_ids:
+                        self.events.put(("notice", f"Message received, but chat {chat_id} is not selected"))
+                        return
                     await self.client(SendReactionRequest(
                         peer=await event.get_input_chat(),
                         msg_id=event.message.id,
                         reaction=[ReactionEmoji(emoticon="🍌")]
                     ))
-                    self.events.put(("reaction", event.chat_id))
+                    self.events.put(("reaction", chat_id))
                 except Exception as exc:
-                    self.events.put(("notice", f"Reaction failed: {exc}"))
+                    self.events.put(("notice", f"Reaction failed: {type(exc).__name__}: {exc}"))
             self._handler = handler
             self.client.add_event_handler(handler, events.NewMessage(incoming=True))
             self.events.put(("active", len(chat_ids)))
