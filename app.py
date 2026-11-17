@@ -174,16 +174,21 @@ class BananaReactApp:
             if not await self.client.is_user_authorized():
                 qr_login = await self.client.qr_login()
                 qr_path = APP_DIR / "login_qr.png"
-                qrcode.make(qr_login.url).save(qr_path)
-                self.events.put(("qr", str(qr_path)))
-                try:
-                    await qr_login.wait(timeout=120)
-                except SessionPasswordNeededError:
-                    future = self.loop.create_future()
-                    self.password_future = future
-                    self.events.put(("need_password", future))
-                    password = await future
-                    await self.client.sign_in(password=password)
+                while True:
+                    qrcode.make(qr_login.url).save(qr_path)
+                    self.events.put(("qr", str(qr_path)))
+                    try:
+                        await qr_login.wait(timeout=35)
+                        break
+                    except asyncio.TimeoutError:
+                        await qr_login.recreate()
+                    except SessionPasswordNeededError:
+                        future = self.loop.create_future()
+                        self.password_future = future
+                        self.events.put(("need_password", future))
+                        password = await future
+                        await self.client.sign_in(password=password)
+                        break
             me = await self.client.get_me()
             self.events.put(("connected", getattr(me, "first_name", "Telegram")))
             dialogs = await self.client.get_dialogs()
