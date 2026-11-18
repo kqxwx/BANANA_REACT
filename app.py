@@ -19,26 +19,28 @@ APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
 ENV_FILE = APP_DIR / "config.env"
 SESSION_FILE = APP_DIR / "banana_session"
 
-# Premium palette
-BG = "#111318"
-SURFACE = "#191C23"
-SURFACE_ALT = "#20242D"
-SURFACE_SOFT = "#252A34"
-TEXT = "#F4F1E9"
-MUTED = "#969BA6"
-GOLD = "#E9C46A"
-GOLD_HOVER = "#F2D58D"
-GREEN = "#9ACB9A"
-RED = "#E58B86"
-BORDER = "#303540"
+# Gen Z palette: midnight graphite, acid lime, electric violet
+BG = "#0D1014"
+SURFACE = "#151A20"
+SURFACE_ALT = "#1C232C"
+SURFACE_SOFT = "#252E39"
+TEXT = "#F4F7F2"
+MUTED = "#9AA6B2"
+GOLD = "#C7F36B"
+GOLD_HOVER = "#D9FF83"
+GREEN = "#A7E58B"
+RED = "#FF7D87"
+BORDER = "#303B47"
+VIOLET = "#A78BFA"
+CYAN = "#67E8F9"
 
 
 class BananaReactApp:
     def __init__(self, root):
         self.root = root
         self.root.title("BANANA REACT — Telegram reactions")
-        self.root.geometry("1120x780")
-        self.root.minsize(980, 700)
+        self.root.geometry("1180x820")
+        self.root.minsize(1020, 740)
         self.root.configure(bg=BG)
 
         self.events = queue.Queue()
@@ -47,6 +49,8 @@ class BananaReactApp:
         self.client = None
         self.worker = None
         self.dialogs = []
+        self.visible_dialog_indices = []
+        self.search_var = tk.StringVar()
         self.qr_photo = None
         self.connected = False
         self.reactions_active = False
@@ -90,8 +94,8 @@ class BananaReactApp:
         mark.create_text(21, 21, text="🍌", font=("Segoe UI Emoji", 19))
         titlebox = tk.Frame(brand, bg=BG)
         titlebox.pack(side="left")
-        self._label(titlebox, "BANANA REACT", 20, TEXT, "bold").pack(anchor="w")
-        self._label(titlebox, "A LITTLE AUTOMATION. A LOT OF PERSONALITY.", 8, MUTED, "bold").pack(anchor="w", pady=(2, 0))
+        self._label(titlebox, "BANANA REACT", 22, TEXT, "bold").pack(anchor="w")
+        self._label(titlebox, "YOUR TELEGRAM. YOUR VIBE. 🍌", 9, GOLD, "bold").pack(anchor="w", pady=(3, 0))
 
         righthead = tk.Frame(header, bg=BG)
         righthead.pack(side="right", anchor="center")
@@ -112,9 +116,9 @@ class BananaReactApp:
         left.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
         hero = self._card(left)
         hero.pack(fill="x")
-        self._label(hero, "YOUR TELEGRAM, REFINED", 8, GOLD, "bold").pack(anchor="w", padx=23, pady=(23, 12))
-        self._label(hero, "Make every\nmessage count.", 25, TEXT, "bold", justify="left").pack(anchor="w", padx=23)
-        self._label(hero, "Connect your personal Telegram account and let the banana do the reacting.", 10, MUTED, wraplength=330, justify="left").pack(anchor="w", padx=23, pady=(12, 21))
+        self._label(hero, "AUTOMATE THE VIBE", 9, GOLD, "bold").pack(anchor="w", padx=23, pady=(23, 12))
+        self._label(hero, "Every chat.\nMore 🍌 energy.", 27, TEXT, "bold", justify="left").pack(anchor="w", padx=23)
+        self._label(hero, "Your personal Telegram sidekick. Pick the chats, switch it on, and let the reactions roll.", 10, MUTED, wraplength=330, justify="left").pack(anchor="w", padx=23, pady=(12, 21))
         self.connect_btn = self._button(hero, "Connect Telegram  ↗", self.connect, primary=True)
         self.connect_btn.pack(fill="x", padx=23, pady=(0, 22))
 
@@ -125,7 +129,7 @@ class BananaReactApp:
         steps = [
             ("01", "Connect", "Scan the QR code in Telegram"),
             ("02", "Choose chats", "Select where reactions belong"),
-            ("03", "Go live", "New incoming messages get 🍌"),
+            ("03", "Go live", "History + new messages get 🍌"),
         ]
         for num, name, desc in steps:
             line = tk.Frame(guide, bg=SURFACE)
@@ -163,16 +167,31 @@ class BananaReactApp:
         # Chat list
         chats = tk.Frame(right, bg=SURFACE)
         chats.grid(row=2, column=0, sticky="nsew", padx=23)
-        chats.grid_rowconfigure(1, weight=1)
+        chats.grid_rowconfigure(2, weight=1)
         chats.grid_columnconfigure(0, weight=1)
         chathead = tk.Frame(chats, bg=SURFACE)
         chathead.grid(row=0, column=0, sticky="ew", pady=(0, 9))
-        self._label(chathead, "YOUR CHATS", 9, TEXT, "bold").pack(side="left")
-        self.chat_count = self._label(chathead, "NOT LOADED", 8, MUTED, "bold")
+        self._label(chathead, "YOUR CHATS", 10, TEXT, "bold").pack(side="left")
+        self.chat_count = self._label(chathead, "NOT LOADED", 8, GOLD, "bold")
         self.chat_count.pack(side="right")
 
+        search_wrap = tk.Frame(chats, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1)
+        search_wrap.grid(row=1, column=0, sticky="ew", pady=(0, 9))
+        self._label(search_wrap, "⌕", 18, GOLD, "bold", bg=SURFACE_ALT).pack(side="left", padx=(12, 7), pady=5)
+        self.search_entry = tk.Entry(
+            search_wrap, textvariable=self.search_var, bg=SURFACE_ALT, fg=TEXT,
+            insertbackground=GOLD, relief="flat", bd=0, font=("Segoe UI", 11),
+            highlightthickness=0
+        )
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 12), pady=10)
+        self.search_entry.insert(0, "Search chats by name…")
+        self.search_entry.configure(fg=MUTED)
+        self.search_entry.bind("<FocusIn>", self._search_focus_in)
+        self.search_entry.bind("<FocusOut>", self._search_focus_out)
+        self.search_var.trace_add("write", self._filter_chats)
+
         listwrap = tk.Frame(chats, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1)
-        listwrap.grid(row=1, column=0, sticky="nsew")
+        listwrap.grid(row=2, column=0, sticky="nsew")
         listwrap.grid_rowconfigure(0, weight=1)
         listwrap.grid_columnconfigure(0, weight=1)
         self.chat_list = tk.Listbox(listwrap, selectmode=tk.EXTENDED, activestyle="none",
@@ -186,8 +205,13 @@ class BananaReactApp:
         self.chat_list.insert(tk.END, "Connect Telegram to load your chats")
 
         # Action bar
+        selection_bar = tk.Frame(right, bg=SURFACE)
+        selection_bar.grid(row=3, column=0, sticky="ew", padx=23, pady=(10, 0))
+        self._button(selection_bar, "Select visible", self._select_visible).pack(side="left")
+        self._button(selection_bar, "Clear", self._clear_selection).pack(side="left", padx=(8, 0))
+
         actions = tk.Frame(right, bg=SURFACE)
-        actions.grid(row=3, column=0, sticky="ew", padx=23, pady=(14, 21))
+        actions.grid(row=4, column=0, sticky="ew", padx=23, pady=(12, 21))
         self.start_btn = self._button(actions, "🍌   Activate reactions", self.enable_reactions, primary=True)
         self.start_btn.pack(fill="x")
         self.start_btn.configure(state="disabled")
@@ -199,6 +223,52 @@ class BananaReactApp:
         footer.pack(fill="x", padx=35, pady=(0, 13))
         self._label(footer, "BANANA REACT  /  PERSONAL TELEGRAM CLIENT", 8, "#686E79", "bold").pack(side="left")
         self._label(footer, "PRIVATE SESSION  •  LOCAL STORAGE", 8, "#686E79", "bold").pack(side="right")
+
+    def _search_focus_in(self, _event=None):
+        if self.search_entry.get() == "Search chats by name…":
+            self.search_entry.delete(0, tk.END)
+            self.search_entry.configure(fg=TEXT)
+
+    def _search_focus_out(self, _event=None):
+        if not self.search_entry.get().strip():
+            self.search_entry.insert(0, "Search chats by name…")
+            self.search_entry.configure(fg=MUTED)
+
+    def _filter_chats(self, *_args):
+        if not hasattr(self, "chat_list"):
+            return
+        query = self.search_var.get().strip().lower()
+        if query == "search chats by name…":
+            query = ""
+        self._render_chat_list(query)
+
+    def _render_chat_list(self, query=""):
+        selected_ids = set()
+        if hasattr(self, "visible_dialog_indices"):
+            for row in self.chat_list.curselection():
+                if row < len(self.visible_dialog_indices):
+                    selected_ids.add(self.dialogs[self.visible_dialog_indices[row]][0])
+        self.visible_dialog_indices = [
+            i for i, (_chat_id, name) in enumerate(self.dialogs)
+            if query in name.lower()
+        ]
+        self.chat_list.delete(0, tk.END)
+        for i in self.visible_dialog_indices:
+            chat_id, name = self.dialogs[i]
+            self.chat_list.insert(tk.END, "  " + name)
+            if chat_id in selected_ids:
+                self.chat_list.selection_set(tk.END)
+        if hasattr(self, "chat_count"):
+            total = len(self.dialogs)
+            shown = len(self.visible_dialog_indices)
+            self.chat_count.configure(text=f"{shown}/{total} CHATS" if query else f"{total} CHATS")
+
+    def _select_visible(self):
+        if self.visible_dialog_indices:
+            self.chat_list.selection_set(0, tk.END)
+
+    def _clear_selection(self):
+        self.chat_list.selection_clear(0, tk.END)
 
     def _set_status(self, text, color=MUTED):
         self.status.configure(text=text.upper(), fg=color)
@@ -284,7 +354,7 @@ class BananaReactApp:
         if not selected:
             messagebox.showinfo("Choose chats", "Select at least one chat to activate reactions.")
             return
-        chat_ids = {self.dialogs[i][0] for i in selected}
+        chat_ids = {self.dialogs[self.visible_dialog_indices[i]][0] for i in selected}
         asyncio.run_coroutine_threadsafe(self._install_handler(chat_ids), self.loop)
 
     async def _install_handler(self, chat_ids):
@@ -395,10 +465,12 @@ class BananaReactApp:
                     self.connect_btn.configure(text="Telegram connected", state="disabled")
                 elif kind == "chats":
                     self.dialogs = data
-                    self.chat_list.delete(0, tk.END)
-                    for _, name in data:
-                        self.chat_list.insert(tk.END, "  " + name)
-                    self.chat_count.configure(text=f"{len(data)} CONVERSATIONS")
+                    self.search_var.set("")
+                    self.search_entry.delete(0, tk.END)
+                    self.search_entry.insert(0, "Search chats by name…")
+                    self.search_entry.configure(fg=MUTED)
+                    self._render_chat_list()
+                    self.chat_count.configure(text=f"{len(data)} CHATS")
                     self.start_btn.configure(state="normal")
                 elif kind == "active":
                     self.reactions_active = True
@@ -413,7 +485,7 @@ class BananaReactApp:
                 elif kind == "reaction":
                     self._set_status("Banana reaction sent", GREEN)
                 elif kind == "notice":
-                    self._set_status(str(data)[:75], GOLD)
+                    self._set_status(str(data)[:75], VIOLET)
                 elif kind == "error":
                     self._set_status("Connection error", RED)
                     self.connect_btn.configure(state="normal", text="Try again")
