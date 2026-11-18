@@ -2,7 +2,7 @@ name: Build BANANA REACT
 
 on:
   push:
-    branches: [main]
+    branches: [main, redesign/glass-premium]
   workflow_dispatch:
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: BANANA REACT v1.0.${{ github.run_number }}
-          target_commitish: main
+          target_commitish: ${{ github.sha }}
           files: BANANA-REACT-Windows.zip
           make_latest: true
           generate_release_notes: true

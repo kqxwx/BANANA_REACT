@@ -20,28 +20,43 @@ ENV_FILE = APP_DIR / "config.env"
 SESSION_FILE = APP_DIR / "banana_session"
 
 # Gen Z palette: midnight graphite, acid lime, electric violet
-BG = "#0D1014"
-SURFACE = "#151A20"
-SURFACE_ALT = "#1C232C"
-SURFACE_SOFT = "#252E39"
-TEXT = "#F4F7F2"
-MUTED = "#9AA6B2"
-GOLD = "#C7F36B"
-GOLD_HOVER = "#D9FF83"
-GREEN = "#A7E58B"
-RED = "#FF7D87"
-BORDER = "#303B47"
-VIOLET = "#A78BFA"
-CYAN = "#67E8F9"
+BG = "#0A1020"
+SURFACE = "#141D32"
+SURFACE_ALT = "#1B2942"
+SURFACE_SOFT = "#263653"
+TEXT = "#F4F7FF"
+MUTED = "#A5B1C8"
+GOLD = "#A99BFF"
+GOLD_HOVER = "#C2B8FF"
+GREEN = "#67E8C5"
+RED = "#FF829D"
+BORDER = "#394967"
+VIOLET = "#B7A8FF"
+CYAN = "#7DD3FC"
 
 
 class BananaReactApp:
     def __init__(self, root):
         self.root = root
         self.root.title("BANANA REACT — Telegram reactions")
-        self.root.geometry("1180x820")
-        self.root.minsize(1020, 740)
+        self.root.geometry("1240x860")
+        self.root.minsize(1080, 760)
         self.root.configure(bg=BG)
+
+        # Native Tkinter frosted-glass treatment: layered ink-blue surfaces,
+        # luminous borders and cool accent tones.
+        style = ttk.Style(self.root)
+        try:
+            style.theme_use("clam")
+        except tk.TclError:
+            pass
+        style.configure("Glass.Vertical.TScrollbar",
+                        background=SURFACE_ALT, troughcolor=SURFACE,
+                        bordercolor=SURFACE, arrowcolor=MUTED,
+                        lightcolor=SURFACE_ALT, darkcolor=SURFACE_ALT,
+                        gripcount=0)
+        style.map("Glass.Vertical.TScrollbar",
+                  background=[("active", SURFACE_SOFT)])
 
         self.events = queue.Queue()
         self.loop = None
@@ -67,11 +82,11 @@ class BananaReactApp:
 
     def _button(self, parent, text, command, primary=False, **kwargs):
         bg = GOLD if primary else SURFACE_SOFT
-        fg = "#17191E" if primary else TEXT
-        hover = GOLD_HOVER if primary else "#303642"
+        fg = "#11172A" if primary else TEXT
+        hover = GOLD_HOVER if primary else "#354461"
         btn = tk.Button(parent, text=text, command=command, bg=bg, fg=fg,
                         activebackground=hover, activeforeground=fg,
-                        disabledforeground="#666B75", relief="flat", bd=0,
+                        disabledforeground="#737F9A", relief="flat", bd=0,
                         font=("Segoe UI", 10, "bold"), cursor="hand2",
                         padx=18, pady=12, highlightthickness=0, **kwargs)
         btn.bind("<Enter>", lambda _e: btn.configure(bg=hover) if btn["state"] != "disabled" else None)
@@ -91,7 +106,7 @@ class BananaReactApp:
         brand.pack(side="left")
         mark = tk.Canvas(brand, width=42, height=42, bg=BG, highlightthickness=0)
         mark.pack(side="left", padx=(0, 12))
-        mark.create_oval(2, 2, 40, 40, fill="#29251B", outline="#51452A", width=1)
+        mark.create_oval(2, 2, 40, 40, fill="#252343", outline="#655A9B", width=1)
         mark.create_text(21, 21, text="🍌", font=("Segoe UI Emoji", 19))
         titlebox = tk.Frame(brand, bg=BG)
         titlebox.pack(side="left")
@@ -100,7 +115,7 @@ class BananaReactApp:
 
         righthead = tk.Frame(header, bg=BG)
         righthead.pack(side="right", anchor="center")
-        self.status_dot = tk.Label(righthead, text="●", bg=BG, fg="#777D89", font=("Segoe UI", 10))
+        self.status_dot = tk.Label(righthead, text="●", bg=BG, fg="#74819B", font=("Segoe UI", 10))
         self.status_dot.pack(side="left", padx=(0, 8))
         self.status = self._label(righthead, "NOT CONNECTED", 9, MUTED, "bold", bg=BG)
         self.status.pack(side="left")
@@ -135,7 +150,7 @@ class BananaReactApp:
         for num, name, desc in steps:
             line = tk.Frame(guide, bg=SURFACE)
             line.pack(fill="x", padx=20, pady=7)
-            chip = tk.Label(line, text=num, bg="#302B20", fg=GOLD,
+            chip = tk.Label(line, text=num, bg="#292747", fg=GOLD,
                             font=("Segoe UI", 8, "bold"), padx=9, pady=7)
             chip.pack(side="left", padx=(0, 12))
             words = tk.Frame(line, bg=SURFACE)
@@ -196,12 +211,13 @@ class BananaReactApp:
         listwrap.grid_rowconfigure(0, weight=1)
         listwrap.grid_columnconfigure(0, weight=1)
         self.chat_list = tk.Listbox(listwrap, selectmode=tk.EXTENDED, activestyle="none",
-            bg=SURFACE_ALT, fg=TEXT, selectbackground="#51452A", selectforeground=GOLD,
+            bg=SURFACE_ALT, fg=TEXT, selectbackground="#655A9B", selectforeground=GOLD,
             relief="flat", highlightthickness=0, font=("Segoe UI", 10),
             exportselection=False, selectborderwidth=0, borderwidth=0)
         self.chat_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=8)
         self.chat_list.bind("<<ListboxSelect>>", self._on_chat_select)
-        scroll = ttk.Scrollbar(listwrap, orient="vertical", command=self.chat_list.yview)
+        scroll = ttk.Scrollbar(listwrap, orient="vertical", command=self.chat_list.yview,
+                               style="Glass.Vertical.TScrollbar")
         scroll.grid(row=0, column=1, sticky="ns", pady=8, padx=(0, 5))
         self.chat_list.configure(yscrollcommand=scroll.set)
         self.chat_list.insert(tk.END, "Connect Telegram to load your chats")
@@ -223,8 +239,8 @@ class BananaReactApp:
 
         footer = tk.Frame(self.root, bg=BG)
         footer.pack(fill="x", padx=35, pady=(0, 13))
-        self._label(footer, "BANANA REACT  /  PERSONAL TELEGRAM CLIENT", 8, "#686E79", "bold").pack(side="left")
-        self._label(footer, "PRIVATE SESSION  •  LOCAL STORAGE", 8, "#686E79", "bold").pack(side="right")
+        self._label(footer, "BANANA REACT  /  PERSONAL TELEGRAM CLIENT", 8, "#74819B", "bold").pack(side="left")
+        self._label(footer, "PRIVATE SESSION  •  LOCAL STORAGE", 8, "#74819B", "bold").pack(side="right")
 
     def _search_focus_in(self, _event=None):
         if self.search_entry.get() == "Search chats by name…":
@@ -447,11 +463,11 @@ class BananaReactApp:
     def _animate(self):
         self._pulse_on = not self._pulse_on
         if self.connected:
-            self.status_dot.configure(fg=GREEN if self._pulse_on else "#5D8D66")
+            self.status_dot.configure(fg=GREEN if self._pulse_on else "#397F79")
         elif self.status.cget("text") != "NOT CONNECTED":
-            self.status_dot.configure(fg=GOLD if self._pulse_on else "#8B7444")
+            self.status_dot.configure(fg=GOLD if self._pulse_on else "#7567B4")
         else:
-            self.status_dot.configure(fg="#777D89")
+            self.status_dot.configure(fg="#74819B")
         self.root.after(700, self._animate)
 
     def _poll_events(self):
