@@ -50,6 +50,7 @@ class BananaReactApp:
         self.worker = None
         self.dialogs = []
         self.visible_dialog_indices = []
+        self.selected_chat_ids = set()
         self.search_var = tk.StringVar()
         self.qr_photo = None
         self.connected = False
@@ -199,6 +200,7 @@ class BananaReactApp:
             relief="flat", highlightthickness=0, font=("Segoe UI", 10),
             exportselection=False, selectborderwidth=0, borderwidth=0)
         self.chat_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=8)
+        self.chat_list.bind("<<ListboxSelect>>", self._on_chat_select)
         scroll = ttk.Scrollbar(listwrap, orient="vertical", command=self.chat_list.yview)
         scroll.grid(row=0, column=1, sticky="ns", pady=8, padx=(0, 5))
         self.chat_list.configure(yscrollcommand=scroll.set)
@@ -234,20 +236,31 @@ class BananaReactApp:
             self.search_entry.insert(0, "Search chats by name…")
             self.search_entry.configure(fg=MUTED)
 
+    def _sync_visible_selection(self):
+        visible_ids = {
+            self.dialogs[i][0] for i in self.visible_dialog_indices
+        }
+        current_ids = {
+            self.dialogs[self.visible_dialog_indices[row]][0]
+            for row in self.chat_list.curselection()
+            if row < len(self.visible_dialog_indices)
+        }
+        self.selected_chat_ids.difference_update(visible_ids)
+        self.selected_chat_ids.update(current_ids)
+
+    def _on_chat_select(self, _event=None):
+        self._sync_visible_selection()
+
     def _filter_chats(self, *_args):
         if not hasattr(self, "chat_list"):
             return
+        self._sync_visible_selection()
         query = self.search_var.get().strip().lower()
         if query == "search chats by name…":
             query = ""
         self._render_chat_list(query)
 
     def _render_chat_list(self, query=""):
-        selected_ids = set()
-        if hasattr(self, "visible_dialog_indices"):
-            for row in self.chat_list.curselection():
-                if row < len(self.visible_dialog_indices):
-                    selected_ids.add(self.dialogs[self.visible_dialog_indices[row]][0])
         self.visible_dialog_indices = [
             i for i, (_chat_id, name) in enumerate(self.dialogs)
             if query in name.lower()
@@ -256,7 +269,7 @@ class BananaReactApp:
         for i in self.visible_dialog_indices:
             chat_id, name = self.dialogs[i]
             self.chat_list.insert(tk.END, "  " + name)
-            if chat_id in selected_ids:
+            if chat_id in self.selected_chat_ids:
                 self.chat_list.selection_set(tk.END)
         if hasattr(self, "chat_count"):
             total = len(self.dialogs)
@@ -264,11 +277,15 @@ class BananaReactApp:
             self.chat_count.configure(text=f"{shown}/{total} CHATS" if query else f"{total} CHATS")
 
     def _select_visible(self):
-        if self.visible_dialog_indices:
-            self.chat_list.selection_set(0, tk.END)
+        self._sync_visible_selection()
+        self.selected_chat_ids.update(
+            self.dialogs[i][0] for i in self.visible_dialog_indices
+        )
+        self._render_chat_list(self.search_var.get().strip().lower())
 
     def _clear_selection(self):
-        self.chat_list.selection_clear(0, tk.END)
+        self.selected_chat_ids.clear()
+        self._render_chat_list(self.search_var.get().strip().lower())
 
     def _set_status(self, text, color=MUTED):
         self.status.configure(text=text.upper(), fg=color)
@@ -350,11 +367,11 @@ class BananaReactApp:
             self.events.put(("error", str(exc)))
 
     def enable_reactions(self):
-        selected = self.chat_list.curselection()
-        if not selected:
+        self._sync_visible_selection()
+        if not self.selected_chat_ids:
             messagebox.showinfo("Choose chats", "Select at least one chat to activate reactions.")
             return
-        chat_ids = {self.dialogs[self.visible_dialog_indices[i]][0] for i in selected}
+        chat_ids = set(self.selected_chat_ids)
         asyncio.run_coroutine_threadsafe(self._install_handler(chat_ids), self.loop)
 
     async def _install_handler(self, chat_ids):
