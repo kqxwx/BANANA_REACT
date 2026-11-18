@@ -261,6 +261,8 @@ class BananaReactApp:
         self._render_chat_list(query)
 
     def _render_chat_list(self, query=""):
+        if query == "search chats by name…":
+            query = ""
         self.visible_dialog_indices = [
             i for i, (_chat_id, name) in enumerate(self.dialogs)
             if query in name.lower()
