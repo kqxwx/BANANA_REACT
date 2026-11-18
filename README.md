@@ -4,7 +4,9 @@ A Windows desktop user-client for your own Telegram account. Sign in with Telegr
 
 ## Download
 
-Open **Actions → Build BANANA REACT → latest successful run → Artifacts** and download `BANANA-REACT-Windows`. Extract the ZIP and run `BANANA_REACT.exe`.
+**[Download the latest BANANA REACT for Windows](https://github.com/kqxwx/BANANA_REACT/releases/latest)**
+
+Open the latest release and download `BANANA-REACT-Windows.zip`. Extract it and run `BANANA_REACT.exe`. The same download is also available under the repository's **Releases** section.
 
 ## First launch
 
