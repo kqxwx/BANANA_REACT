@@ -83,148 +83,248 @@ class BananaReactApp:
                         highlightthickness=1, **kwargs)
 
     def _build_ui(self):
-        # Header
-        header = tk.Frame(self.root, bg=BG)
-        header.pack(fill="x", padx=34, pady=(27, 23))
+        # Dashboard layout inspired by the supplied reference screenshot.
+        self.root.title("BANANA REACT — Telegram dashboard")
+        self.root.geometry("1194x664")
+        self.root.minsize(1000, 620)
+        self.root.configure(bg=BG)
 
-        brand = tk.Frame(header, bg=BG)
-        brand.pack(side="left")
-        mark = tk.Canvas(brand, width=42, height=42, bg=BG, highlightthickness=0)
-        mark.pack(side="left", padx=(0, 12))
-        mark.create_oval(2, 2, 40, 40, fill="#29251B", outline="#51452A", width=1)
-        mark.create_text(21, 21, text="🍌", font=("Segoe UI Emoji", 19))
-        titlebox = tk.Frame(brand, bg=BG)
-        titlebox.pack(side="left")
-        self._label(titlebox, "BANANA REACT", 22, TEXT, "bold").pack(anchor="w")
-        self._label(titlebox, "YOUR TELEGRAM. YOUR VIBE. 🍌", 9, GOLD, "bold").pack(anchor="w", pady=(3, 0))
+        shell = tk.Frame(self.root, bg=BG)
+        shell.pack(fill="both", expand=True)
 
-        righthead = tk.Frame(header, bg=BG)
-        righthead.pack(side="right", anchor="center")
-        self.status_dot = tk.Label(righthead, text="●", bg=BG, fg="#777D89", font=("Segoe UI", 10))
-        self.status_dot.pack(side="left", padx=(0, 8))
-        self.status = self._label(righthead, "NOT CONNECTED", 9, MUTED, "bold", bg=BG)
-        self.status.pack(side="left")
+        # Slim icon rail
+        rail = tk.Frame(shell, bg="#050705", width=52)
+        rail.pack(side="left", fill="y")
+        rail.pack_propagate(False)
+        tk.Label(rail, text="◈", bg="#050705", fg=GREEN,
+                 font=("Segoe UI", 20, "bold")).pack(pady=(14, 3))
+        tk.Label(rail, text="BANANA\nREACT", bg="#050705", fg=TEXT,
+                 font=("Segoe UI", 6, "bold"), justify="center").pack(pady=(0, 20))
+        for glyph in ("⌂", "➤", "♡", "⚙", "▤"):
+            tk.Label(rail, text=glyph, bg="#050705", fg="#778477",
+                     font=("Segoe UI Symbol", 15), pady=10).pack(fill="x")
 
-        # Main columns
-        body = tk.Frame(self.root, bg=BG)
-        body.pack(fill="both", expand=True, padx=34, pady=(0, 30))
-        body.grid_columnconfigure(0, weight=4, uniform="main")
-        body.grid_columnconfigure(1, weight=6, uniform="main")
-        body.grid_rowconfigure(0, weight=1)
+        # Navigation column
+        nav = tk.Frame(shell, bg="#0C110C", width=188)
+        nav.pack(side="left", fill="y")
+        nav.pack_propagate(False)
+        nav_head = tk.Frame(nav, bg="#0C110C")
+        nav_head.pack(fill="x", padx=12, pady=(17, 12))
+        tk.Label(nav_head, text="BANANA REACT", bg="#0C110C", fg=TEXT,
+                 font=("Segoe UI", 11, "bold")).pack(side="left")
+        tk.Label(nav_head, text="●", bg="#0C110C", fg=GREEN,
+                 font=("Segoe UI", 11)).pack(side="right")
+        self.connect_btn = self._button(nav, "＋  Add Telegram account", self.connect, primary=True)
+        self.connect_btn.pack(fill="x", padx=10, pady=(4, 15))
+        tk.Label(nav, text="HOME", bg="#0C110C", fg="#738073",
+                 font=("Segoe UI", 7, "bold")).pack(anchor="w", padx=14, pady=(2, 7))
+        for item in ("▣  DASHBOARD", "♧  TELEGRAM ACCOUNT", "◉  CHAT SELECTION",
+                     "✦  REACTION SETTINGS", "▤  ACTIVITY LOG"):
+            active = item.startswith("▣")
+            tk.Label(nav, text=item, bg="#142014" if active else "#0C110C",
+                     fg=GREEN if active else "#A0ACA0",
+                     font=("Segoe UI", 8, "bold"), anchor="w",
+                     padx=10, pady=10).pack(fill="x", padx=7, pady=2)
+        tk.Label(nav, text=" ", bg="#0C110C").pack(expand=True, fill="both")
+        tk.Label(nav, text="LOCAL SESSION\nPRIVATE STORAGE", bg="#0C110C",
+                 fg="#5E6B5E", font=("Segoe UI", 7, "bold"),
+                 justify="left").pack(anchor="w", padx=13, pady=14)
 
-        # Left column: welcome + connection
-        left = tk.Frame(body, bg=BG)
-        left.grid(row=0, column=0, sticky="nsew", padx=(0, 14))
-        hero = self._card(left)
-        hero.pack(fill="x")
-        self._label(hero, "AUTOMATE THE VIBE", 9, GOLD, "bold").pack(anchor="w", padx=23, pady=(23, 12))
-        self._label(hero, "Every chat.\nMore 🍌 energy.", 27, TEXT, "bold", justify="left").pack(anchor="w", padx=23)
-        self._label(hero, "Your personal Telegram sidekick. Pick the chats, switch it on, and let the reactions roll.", 10, MUTED, wraplength=330, justify="left").pack(anchor="w", padx=23, pady=(12, 21))
-        self.connect_btn = self._button(hero, "Connect Telegram  ↗", self.connect, primary=True)
-        self.connect_btn.pack(fill="x", padx=23, pady=(0, 22))
+        # Main workspace
+        main = tk.Frame(shell, bg=BG)
+        main.pack(side="left", fill="both", expand=True, padx=(12, 12), pady=10)
+        main.grid_columnconfigure(0, weight=55, uniform="columns")
+        main.grid_columnconfigure(1, weight=45, uniform="columns")
+        main.grid_rowconfigure(2, weight=1)
 
-        # Connection guide
-        guide = self._card(left)
-        guide.pack(fill="x", pady=(14, 0))
-        self._label(guide, "THE QUICK SETUP", 9, TEXT, "bold").pack(anchor="w", padx=21, pady=(19, 13))
-        steps = [
-            ("01", "Connect", "Scan the QR code in Telegram"),
-            ("02", "Choose chats", "Select where reactions belong"),
-            ("03", "Go live", "History + new messages get 🍌"),
+        title_row = tk.Frame(main, bg=BG)
+        title_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 9))
+        tk.Label(title_row, text="Dashboard", bg=BG, fg=TEXT,
+                 font=("Segoe UI", 14, "bold")).pack(side="left")
+        self.status_dot = tk.Label(title_row, text="●", bg=BG, fg="#657065",
+                                   font=("Segoe UI", 9))
+        self.status_dot.pack(side="right", padx=(0, 6))
+        self.status = tk.Label(title_row, text="NOT CONNECTED", bg=BG, fg=MUTED,
+                               font=("Segoe UI", 8, "bold"))
+        self.status.pack(side="right")
+
+        # Six compact statistic tiles
+        stats = tk.Frame(main, bg=BG)
+        stats.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        for i in range(6):
+            stats.grid_columnconfigure(i, weight=1, uniform="stats")
+        stat_specs = [
+            ("TELEGRAM", "OFFLINE", GREEN),
+            ("TOTAL CHATS", "0", "#D9B36B"),
+            ("SELECTED", "0", "#D9D36B"),
+            ("REACTIONS", "0", "#72A9E8"),
+            ("HISTORY", "READY", "#D96B6B"),
+            ("VERSION", "1.0", "#A66BE0"),
         ]
-        for num, name, desc in steps:
-            line = tk.Frame(guide, bg=SURFACE)
-            line.pack(fill="x", padx=20, pady=7)
-            chip = tk.Label(line, text=num, bg="#302B20", fg=GOLD,
-                            font=("Segoe UI", 8, "bold"), padx=9, pady=7)
-            chip.pack(side="left", padx=(0, 12))
-            words = tk.Frame(line, bg=SURFACE)
-            words.pack(side="left", fill="x", expand=True)
-            self._label(words, name, 10, TEXT, "bold").pack(anchor="w")
-            self._label(words, desc, 8, MUTED).pack(anchor="w", pady=(2, 0))
-        self._label(guide, "⌁  Your login session stays on this PC.", 8, MUTED).pack(anchor="w", padx=21, pady=(15, 19))
+        self.stat_values = []
+        for i, (caption, value, accent) in enumerate(stat_specs):
+            tile = tk.Frame(stats, bg="#111611", highlightbackground="#273127",
+                            highlightthickness=1)
+            tile.grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else 5, 0))
+            tk.Label(tile, text=caption, bg="#111611", fg=accent,
+                     font=("Segoe UI", 6, "bold")).pack(anchor="w", padx=9, pady=(7, 2))
+            val = tk.Label(tile, text=value, bg="#111611", fg=TEXT,
+                           font=("Segoe UI", 12, "bold"))
+            val.pack(anchor="w", padx=9, pady=(0, 7))
+            self.stat_values.append(val)
 
-        # Right column workspace
-        right = self._card(body)
-        right.grid(row=0, column=1, sticky="nsew")
-        right.grid_rowconfigure(2, weight=1)
+        # Left settings panel
+        settings = tk.Frame(main, bg="#101510", highlightbackground="#263226",
+                            highlightthickness=1)
+        settings.grid(row=2, column=0, sticky="nsew", padx=(0, 6))
+        settings.grid_columnconfigure(0, weight=1)
+        tk.Label(settings, text="SETTINGS", bg="#101510", fg=TEXT,
+                 font=("Segoe UI", 9, "bold")).grid(row=0, column=0, sticky="w", padx=12, pady=(10, 7))
+
+        account_box = tk.Frame(settings, bg="#151D15")
+        account_box.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 8))
+        account_box.grid_columnconfigure(0, weight=1)
+        tk.Label(account_box, text="TELEGRAM ACCOUNT", bg="#151D15", fg=GREEN,
+                 font=("Segoe UI", 7, "bold")).grid(row=0, column=0, sticky="w", padx=9, pady=(7, 2))
+        self.qr_area = tk.Frame(account_box, bg="#151D15", height=88)
+        self.qr_area.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 3))
+        self.qr_area.grid_propagate(False)
+        self.qr_label = tk.Label(self.qr_area, text="QR LOGIN", bg="#151D15",
+                                 fg=GREEN, font=("Segoe UI", 9, "bold"))
+        self.qr_label.pack(expand=True, fill="both")
+        self.qr_hint = tk.Label(account_box, text="Scan a secure QR code to connect",
+                                bg="#151D15", fg=MUTED, font=("Segoe UI", 7))
+        self.qr_hint.grid(row=2, column=0, sticky="w", padx=9, pady=(0, 7))
+
+        tk.Label(settings, text="REACTION SETTINGS", bg="#101510", fg=TEXT,
+                 font=("Segoe UI", 8, "bold")).grid(row=2, column=0, sticky="w", padx=12, pady=(3, 7))
+        opts = tk.Frame(settings, bg="#101510")
+        opts.grid(row=3, column=0, sticky="ew", padx=10)
+        opts.grid_columnconfigure(0, weight=1)
+        opts.grid_columnconfigure(1, weight=1)
+        for row, (label, value) in enumerate((
+            ("Reaction", "🍌  Banana"),
+            ("Messages", "All available history"),
+            ("New messages", "Incoming + outgoing"),
+            ("Chat scope", "Selected chats only"),
+        )):
+            for col, text in enumerate((label, value)):
+                tk.Label(opts, text=text, bg="#151D15" if col else "#121812",
+                         fg=TEXT if col else MUTED, font=("Segoe UI", 7),
+                         anchor="w", padx=8, pady=7).grid(row=row, column=col, sticky="ew",
+                                                          padx=(0, 3) if col == 0 else (3, 0),
+                                                          pady=2)
+
+        tk.Label(settings, text="CHAT SELECTION", bg="#101510", fg=TEXT,
+                 font=("Segoe UI", 8, "bold")).grid(row=4, column=0, sticky="w", padx=12, pady=(8, 5))
+        selection_bar = tk.Frame(settings, bg="#101510")
+        selection_bar.grid(row=5, column=0, sticky="ew", padx=10)
+        self.chat_count = tk.Label(selection_bar, text="NOT LOADED", bg="#101510",
+                                   fg=GREEN, font=("Segoe UI", 7, "bold"))
+        self.chat_count.pack(side="left")
+        self._button(selection_bar, "Select all", self._select_visible).pack(side="right", padx=(4, 0))
+        self._button(selection_bar, "Clear", self._clear_selection).pack(side="right")
+
+        actions = tk.Frame(settings, bg="#101510")
+        actions.grid(row=6, column=0, sticky="ew", padx=10, pady=(10, 10))
+        self.start_btn = self._button(actions, "▶  ACTIVATE REACTIONS", self.enable_reactions, primary=True)
+        self.start_btn.pack(fill="x")
+        self.start_btn.configure(state="disabled")
+        self.stop_btn = self._button(actions, "■  PAUSE REACTIONS", self.stop_reactions)
+        self.stop_btn.pack(fill="x", pady=(6, 0))
+        self.stop_btn.configure(state="disabled")
+
+        # Right side: searchable chats, results and action log
+        right = tk.Frame(main, bg=BG)
+        right.grid(row=2, column=1, sticky="nsew", padx=(6, 0))
+        right.grid_rowconfigure(1, weight=5)
+        right.grid_rowconfigure(3, weight=2)
         right.grid_columnconfigure(0, weight=1)
 
-        workspace_head = tk.Frame(right, bg=SURFACE)
-        workspace_head.grid(row=0, column=0, sticky="ew", padx=23, pady=(21, 13))
-        self._label(workspace_head, "Workspace", 17, TEXT, "bold").pack(anchor="w")
-        self._label(workspace_head, "Your connected account and selected conversations.", 9, MUTED).pack(anchor="w", pady=(4, 0))
-
-        # QR / account state panel
-        self.qr_area = tk.Frame(right, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1, height=225)
-        self.qr_area.grid(row=1, column=0, sticky="ew", padx=23, pady=(0, 17))
-        self.qr_area.grid_propagate(False)
-        self.qr_label = tk.Label(self.qr_area, text="QR LOGIN", bg=SURFACE_ALT, fg=GOLD,
-                                 font=("Segoe UI", 9, "bold"), justify="center")
-        self.qr_label.pack(expand=True, fill="both", pady=12)
-        self.qr_hint = self._label(self.qr_area, "Your secure Telegram sign-in will appear here.", 8, MUTED, bg=SURFACE_ALT)
-        self.qr_hint.place(relx=0.5, rely=0.87, anchor="center")
-
-        # Chat list
-        chats = tk.Frame(right, bg=SURFACE)
-        chats.grid(row=2, column=0, sticky="nsew", padx=23)
-        chats.grid_rowconfigure(2, weight=1)
-        chats.grid_columnconfigure(0, weight=1)
-        chathead = tk.Frame(chats, bg=SURFACE)
-        chathead.grid(row=0, column=0, sticky="ew", pady=(0, 9))
-        self._label(chathead, "YOUR CHATS", 10, TEXT, "bold").pack(side="left")
-        self.chat_count = self._label(chathead, "NOT LOADED", 8, GOLD, "bold")
-        self.chat_count.pack(side="right")
-
-        search_wrap = tk.Frame(chats, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1)
-        search_wrap.grid(row=1, column=0, sticky="ew", pady=(0, 9))
-        self._label(search_wrap, "⌕", 18, GOLD, "bold", bg=SURFACE_ALT).pack(side="left", padx=(12, 7), pady=5)
-        self.search_entry = tk.Entry(
-            search_wrap, textvariable=self.search_var, bg=SURFACE_ALT, fg=TEXT,
-            insertbackground=GOLD, relief="flat", bd=0, font=("Segoe UI", 11),
-            highlightthickness=0
-        )
-        self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 12), pady=10)
+        chat_panel = tk.Frame(right, bg="#101510", highlightbackground="#263226",
+                              highlightthickness=1)
+        chat_panel.grid(row=0, column=0, sticky="nsew", pady=(0, 8))
+        chat_panel.grid_columnconfigure(0, weight=1)
+        tk.Label(chat_panel, text="LIST OF CHATS", bg="#101510", fg=TEXT,
+                 font=("Segoe UI", 8, "bold")).grid(row=0, column=0, sticky="w", padx=10, pady=(8, 5))
+        search_wrap = tk.Frame(chat_panel, bg="#171E17", highlightbackground="#293629",
+                               highlightthickness=1)
+        search_wrap.grid(row=1, column=0, sticky="ew", padx=9, pady=(0, 7))
+        tk.Label(search_wrap, text="⌕", bg="#171E17", fg=GREEN,
+                 font=("Segoe UI", 13)).pack(side="left", padx=(8, 4))
+        self.search_var = tk.StringVar()
+        self.search_entry = tk.Entry(search_wrap, textvariable=self.search_var,
+                                     bg="#171E17", fg=TEXT, insertbackground=GREEN,
+                                     relief="flat", bd=0, font=("Segoe UI", 8))
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=5, pady=7)
         self.search_entry.insert(0, "Search chats by name…")
         self.search_entry.configure(fg=MUTED)
         self.search_entry.bind("<FocusIn>", self._search_focus_in)
         self.search_entry.bind("<FocusOut>", self._search_focus_out)
         self.search_var.trace_add("write", self._filter_chats)
 
-        listwrap = tk.Frame(chats, bg=SURFACE_ALT, highlightbackground=BORDER, highlightthickness=1)
-        listwrap.grid(row=2, column=0, sticky="nsew")
+        listwrap = tk.Frame(chat_panel, bg="#171E17", highlightbackground="#293629",
+                            highlightthickness=1)
+        listwrap.grid(row=2, column=0, sticky="nsew", padx=9, pady=(0, 9))
+        chat_panel.grid_rowconfigure(2, weight=1)
         listwrap.grid_rowconfigure(0, weight=1)
         listwrap.grid_columnconfigure(0, weight=1)
         self.chat_list = tk.Listbox(listwrap, selectmode=tk.EXTENDED, activestyle="none",
-            bg=SURFACE_ALT, fg=TEXT, selectbackground="#51452A", selectforeground=GOLD,
-            relief="flat", highlightthickness=0, font=("Segoe UI", 10),
+            bg="#171E17", fg=TEXT, selectbackground="#245D1E", selectforeground="#8CFF70",
+            relief="flat", highlightthickness=0, font=("Segoe UI", 8),
             exportselection=False, selectborderwidth=0, borderwidth=0)
-        self.chat_list.grid(row=0, column=0, sticky="nsew", padx=10, pady=8)
+        self.chat_list.grid(row=0, column=0, sticky="nsew", padx=7, pady=5)
         self.chat_list.bind("<<ListboxSelect>>", self._on_chat_select)
         scroll = ttk.Scrollbar(listwrap, orient="vertical", command=self.chat_list.yview)
-        scroll.grid(row=0, column=1, sticky="ns", pady=8, padx=(0, 5))
+        scroll.grid(row=0, column=1, sticky="ns", pady=5, padx=(0, 4))
         self.chat_list.configure(yscrollcommand=scroll.set)
         self.chat_list.insert(tk.END, "Connect Telegram to load your chats")
 
-        # Action bar
-        selection_bar = tk.Frame(right, bg=SURFACE)
-        selection_bar.grid(row=3, column=0, sticky="ew", padx=23, pady=(10, 0))
-        self._button(selection_bar, "Select visible", self._select_visible).pack(side="left")
-        self._button(selection_bar, "Clear", self._clear_selection).pack(side="left", padx=(8, 0))
+        results_panel = tk.Frame(right, bg="#101510", highlightbackground="#263226",
+                                 highlightthickness=1)
+        results_panel.grid(row=1, column=0, sticky="nsew", pady=(0, 8))
+        results_panel.grid_columnconfigure(0, weight=1)
+        results_panel.grid_rowconfigure(1, weight=1)
+        tk.Label(results_panel, text="RESULTS", bg="#101510", fg=TEXT,
+                 font=("Segoe UI", 8, "bold")).grid(row=0, column=0, sticky="w", padx=10, pady=7)
+        self.results_text = tk.Text(results_panel, bg="#0B0E0B", fg="#9DA99D",
+                                    insertbackground=GREEN, relief="flat", bd=0,
+                                    font=("Consolas", 7), height=3, wrap="word",
+                                    state="disabled")
+        self.results_text.grid(row=1, column=0, sticky="nsew", padx=9, pady=(0, 8))
 
-        actions = tk.Frame(right, bg=SURFACE)
-        actions.grid(row=4, column=0, sticky="ew", padx=23, pady=(12, 21))
-        self.start_btn = self._button(actions, "🍌   Activate reactions", self.enable_reactions, primary=True)
-        self.start_btn.pack(fill="x")
-        self.start_btn.configure(state="disabled")
-        self.stop_btn = self._button(actions, "Pause reactions", self.stop_reactions)
-        self.stop_btn.pack(fill="x", pady=(8, 0))
-        self.stop_btn.configure(state="disabled")
+        log_panel = tk.Frame(right, bg="#101510", highlightbackground="#263226",
+                             highlightthickness=1)
+        log_panel.grid(row=2, column=0, sticky="nsew")
+        log_panel.grid_columnconfigure(0, weight=1)
+        log_panel.grid_rowconfigure(1, weight=1)
+        tk.Label(log_panel, text="PROGRAM ACTIONS", bg="#101510", fg=TEXT,
+                 font=("Segoe UI", 8, "bold")).grid(row=0, column=0, sticky="w", padx=10, pady=7)
+        self.activity_text = tk.Text(log_panel, bg="#0B0E0B", fg="#9DA99D",
+                                     insertbackground=GREEN, relief="flat", bd=0,
+                                     font=("Consolas", 7), height=5, wrap="word",
+                                     state="disabled")
+        self.activity_text.grid(row=1, column=0, sticky="nsew", padx=9, pady=(0, 8))
+        self._append_log("ready", "BANANA REACT dashboard ready")
 
-        footer = tk.Frame(self.root, bg=BG)
-        footer.pack(fill="x", padx=35, pady=(0, 13))
-        self._label(footer, "BANANA REACT  /  PERSONAL TELEGRAM CLIENT", 8, "#686E79", "bold").pack(side="left")
-        self._label(footer, "PRIVATE SESSION  •  LOCAL STORAGE", 8, "#686E79", "bold").pack(side="right")
+    def _append_log(self, kind, data):
+        line = f"[{kind.upper()}] {data}"
+        for widget in (getattr(self, "results_text", None), getattr(self, "activity_text", None)):
+            if widget is None:
+                continue
+            widget.configure(state="normal")
+            widget.insert("end", line + "\\n")
+            widget.see("end")
+            widget.configure(state="disabled")
+
+    def _update_stats(self):
+        if not hasattr(self, "stat_values"):
+            return
+        self.stat_values[0].configure(text="ONLINE" if self.connected else "OFFLINE")
+        self.stat_values[1].configure(text=str(len(self.dialogs)))
+        self.stat_values[2].configure(text=str(len(self.selected_chat_ids)))
+        self.stat_values[3].configure(text="ACTIVE" if self.reactions_active else "IDLE")
+        self.stat_values[4].configure(text="SCANNING" if self.reactions_active else "READY")
 
     def _search_focus_in(self, _event=None):
         if self.search_entry.get() == "Search chats by name…":
