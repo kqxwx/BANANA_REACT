@@ -19,20 +19,20 @@ APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False)
 ENV_FILE = APP_DIR / "config.env"
 SESSION_FILE = APP_DIR / "banana_session"
 
-# Gen Z palette: midnight graphite, acid lime, electric violet
-BG = "#0D1014"
-SURFACE = "#151A20"
-SURFACE_ALT = "#1C232C"
-SURFACE_SOFT = "#252E39"
-TEXT = "#F4F7F2"
-MUTED = "#9AA6B2"
-GOLD = "#C7F36B"
-GOLD_HOVER = "#D9FF83"
-GREEN = "#A7E58B"
-RED = "#FF7D87"
-BORDER = "#303B47"
-VIOLET = "#A78BFA"
-CYAN = "#67E8F9"
+# Dark graphite + electric green palette matching the supplied reference.
+BG = "#080A08"
+SURFACE = "#101510"
+SURFACE_ALT = "#151D15"
+SURFACE_SOFT = "#202A20"
+TEXT = "#E7EDE7"
+MUTED = "#879387"
+GOLD = "#39F51E"
+GOLD_HOVER = "#6BFF55"
+GREEN = "#39F51E"
+RED = "#F04455"
+BORDER = "#293629"
+VIOLET = "#9B72C8"
+CYAN = "#72A9E8"
 
 
 class BananaReactApp:
@@ -237,8 +237,9 @@ class BananaReactApp:
         # Right side: searchable chats, results and action log
         right = tk.Frame(main, bg=BG)
         right.grid(row=2, column=1, sticky="nsew", padx=(6, 0))
-        right.grid_rowconfigure(1, weight=5)
-        right.grid_rowconfigure(3, weight=2)
+        right.grid_rowconfigure(0, weight=4)
+        right.grid_rowconfigure(1, weight=2)
+        right.grid_rowconfigure(2, weight=3)
         right.grid_columnconfigure(0, weight=1)
 
         chat_panel = tk.Frame(right, bg="#101510", highlightbackground="#263226",
